@@ -118,7 +118,7 @@ class Localization:
     def localize(self, x_0=[0, 0, 0], N_gamma_grid=1000, gamma_max=50, iteration_end=10):
         """Routine for Gauss Netwon with Line Search"""
         for qr in self.qr_codes:
-            y = np.array([[measurement.height, measurement.cx] for measurement in qr.measurements])
+            y = [[measurement.height, measurement.cx] for measurement in qr.measurements]
             x_GN_LS = np.zeros((iteration_end,3)) #the path of the estimation
             x_GN_LS[0,:] = x_0
             gamma = np.arange(1,N_gamma_grid+1)*gamma_max/N_gamma_grid
@@ -128,8 +128,9 @@ class Localization:
                 gj = self.g(x_now, qr.sx, qr.sy)
                 Gj = self.G(x_now, qr.sx, qr.sy)
                 if (det(Gj.T @ self.R_inv @ Gj) == 0):
-                    print(f"rq code {qr.id}, {j}")
+                    print(f"qr code {qr.id}, {j} th iteration found a singular matrix")
                     print(Gj.T @ self.R_inv @ Gj)
+                    continue
                 Delta_x = np.linalg.solve((Gj.T @ self.R_inv @ Gj),Gj.T@ self.R_inv @ np.sum(y - gj , axis=0) / len(y))
                 J_min = self.Jwls(x_now, y, qr.sx, qr.sy)
                 gamma_min = 0
