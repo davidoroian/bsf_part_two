@@ -14,6 +14,20 @@ class Measurement:
     cx: float
     height: float
 
+@dataclass
+class Estimation:
+    """Class for describing the estimation of the robot's position and heading.
+    
+    Attributes:
+        timestamp: The timestamp of the estimation.
+        px: x-coordinate of the robot.
+        py: y-coordinate of the robot.
+        psi: heading of the robot.
+    """
+    px: float
+    py: float
+    psi: float
+
 class QrCode:
     """Class for describing the QR code initialized with the id and global poistion. 
     It computes the mean center and height of the code as seen by the camera given measurements.
@@ -41,7 +55,10 @@ class QrCode:
         self.sx = sx
         self.sy = sy
         self.measurements = []
-
+        self.var_cx = None
+        self.var_height = None
+        self.estimation = []
+        
     def update_measurements(self, measurements: list[Measurement]):
         """Updates the QR code with new measurements.
 
@@ -57,4 +74,18 @@ class QrCode:
             measurement: A new measurement from the camera module.
         """
         self.measurements.append(measurement)
+
+    def compute_variance(self):
+        """Computes the variance and variance matrix of the center x and height measurements."""
+        self.var_cx = np.round(np.var([measurement.cx for measurement in self.measurements]), decimals=3)
+        self.var_height = np.round(np.var([measurement.height for measurement in self.measurements]), decimals=3)
+
+    def update_estimation(self, estimation: list[Estimation]):
+        """Updates the QR code with a new estimation.
+
+        Args:
+            estimation: A new estimation of the robot's position and heading.
+        """
+        self.estimation = estimation
+
     
