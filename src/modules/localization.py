@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.linalg import det
 
 from utils.utils import sec, compute_gradient_and_bias
 from .qr_code import Estimation
@@ -126,8 +127,9 @@ class Localization:
                 x_now = x_GN_LS[j,:]
                 gj = self.g(x_now, qr.sx, qr.sy)
                 Gj = self.G(x_now, qr.sx, qr.sy)
-                print(Gj.T @ self.R_inv @ Gj)
-                print(Gj.T@ self.R_inv @ np.sum(y - gj , axis=0) / len(y))
+                if (det(Gj.T @ self.R_inv @ Gj) == 0):
+                    print(f"rq code {qr.id}, {j}")
+                    print(Gj.T @ self.R_inv @ Gj)
                 Delta_x = np.linalg.solve((Gj.T @ self.R_inv @ Gj),Gj.T@ self.R_inv @ np.sum(y - gj , axis=0) / len(y))
                 J_min = self.Jwls(x_now, y, qr.sx, qr.sy)
                 gamma_min = 0
