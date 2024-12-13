@@ -87,5 +87,3 @@ class QrCode:
             estimation: A new estimation of the robot's position and heading.
         """
         self.estimation = estimation
-
-    

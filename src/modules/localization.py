@@ -1,9 +1,10 @@
 import numpy as np
+import pandas as pd
 from numpy.linalg import det
 
 from utils.utils import sec, compute_gradient_and_bias
 from .qr_code import Estimation
-from .qr_code import QrCode
+from .qr_code import QrCode, Measurement
 
 
 class Localization:
@@ -24,10 +25,34 @@ class Localization:
         self.camera_gradient, self.camera_bias = compute_gradient_and_bias(self.path, distance_bias)
         self.f = self.camera_gradient/h0
         self.average_location_estimate = []
-
+        self.R = 0
+        self.R_inv = 0
         # Computing the vairance matrices
-        avg_variance_cx = np.round(np.average([qr_code.var_cx for qr_code in qr_codes]), decimals=3) 
-        avg_variance_height = np.round(np.average([qr_code.var_height for qr_code in qr_codes]), decimals=3)
+        
+
+    def calibrate(self, path):
+        camera_columns = ['timestamp', 'qr_code', 'cx', 'cy', 'width', 'height', 'distance', 'attitude']
+        qr_df = pd.read_csv('../data/qr_code_position_in_global_coordinate.csv')
+        camera_df = pd.read_csv(path, header=None, names=camera_columns)
+        # Setting up required QR codes' data for the task
+
+        qr_codes = []
+        for index, row in qr_df.iterrows():
+            qr = QrCode(int(row['qr_code']), row['mid_point_x_cm'], row['mid_point_y_cm'])
+            qr_codes.append(qr)
+
+        for qr in qr_codes:
+            for index, row in camera_df.iterrows():
+                if row['qr_code'] == qr.id:
+                    qr.add_measurement(Measurement(row['timestamp'], row['cx'], row['height']))
+
+        for qr in qr_codes:
+            if len(qr.measurements) <= 1:
+                qr_codes.remove(qr)
+            else:
+                qr.compute_variance()
+        avg_variance_cx = np.round(np.mean([qr_code.var_cx for qr_code in qr_codes if qr_code.var_cx is not None] ), decimals=3) 
+        avg_variance_height = np.round(np.mean([qr_code.var_height for qr_code in qr_codes if qr_code.var_cx is not None]), decimals=3)
         self.R = np.array([[avg_variance_height, 0], [0, avg_variance_cx]])
         self.R_inv = np.array([[np.round(1/avg_variance_height, decimals=3), 0], [0, np.round(1/avg_variance_cx, decimals=3)]])
 
