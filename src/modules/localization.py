@@ -28,7 +28,7 @@ class Localization:
         avg_variance_cx = np.round(np.average([qr_code.var_cx for qr_code in qr_codes]), decimals=3) 
         avg_variance_height = np.round(np.average([qr_code.var_height for qr_code in qr_codes]), decimals=3)
         self.R = np.array([[avg_variance_height, 0], [0, avg_variance_cx]])
-        self.R_inv = np.array([[1/avg_variance_height, 0], [0, 1/avg_variance_cx]])
+        self.R_inv = np.array([[np.round(1/avg_variance_height, decimals=3), 0], [0, np.round(1/avg_variance_cx, decimals=3)]])
 
     def g(self, x, sx, sy):
         """Measurement model 
@@ -44,8 +44,14 @@ class Localization:
         px, py, psi = x
         
         h = float((self.h0*self.f)/np.sqrt((sx-px)**2+(sy-py)**2))
+
+        res = np.arctan2((sy-py), (sx-px))
+        if res > np.pi:
+            res = res - 2*np.pi
+        elif res < -np.pi:
+            res = res + 2*np.pi
         
-        cx = float(self.f*np.tan(np.arctan((sy-py)/(sx-px))-psi))
+        cx = float(self.f*np.tan(res-psi))
         
         return np.array([h,cx])
         
@@ -98,24 +104,8 @@ class Localization:
     def Jwls(self, x, y, sx, sy):
         e = (y - self.g(x, sx, sy)) @ self.R_inv
         return np.sum(e**2)
-
-    """ Line search on Grid
-    find x in the line points that minimize Jwls
-    """
-    def find_gamma_min(x,dx,line_gammas,J_):
-        x_min =  x + line_gammas[0]*dx
-        J_min = J_(x_min)
-        min_index = 0
-        for i in range(1,len(line_gammas)):
-            x_new = x + line_gammas[i]*dx
-            J_new = J_(x_new)
-            if J_new<J_min:
-                J_min = J_new
-                min_index = i
-        
-        return line_gammas[min_index]
     
-    def localize(self, x_0=[0, 0, 0], N_gamma_grid=1000, gamma_max=50, iteration_end=10):
+    def localize(self, x_0=[0, 0, 0], N_gamma_grid=1000, gamma_max=50, iteration_end=10, epsilon=1e-8):
         """Routine for Gauss Netwon with Line Search"""
         for qr in self.qr_codes:
             y = [[measurement.height, measurement.cx] for measurement in qr.measurements]
@@ -127,11 +117,13 @@ class Localization:
                 x_now = x_GN_LS[j,:]
                 gj = self.g(x_now, qr.sx, qr.sy)
                 Gj = self.G(x_now, qr.sx, qr.sy)
-                if (det(Gj.T @ self.R_inv @ Gj) == 0):
-                    print(f"qr code {qr.id}, {j} th iteration found a singular matrix")
-                    print(Gj.T @ self.R_inv @ Gj)
-                    continue
-                Delta_x = np.linalg.solve((Gj.T @ self.R_inv @ Gj),Gj.T@ self.R_inv @ np.sum(y - gj , axis=0) / len(y))
+                # if (det(Gj.T @ self.R_inv @ Gj) == 0):
+                #     print(f"qr code {qr.id}, {j} th iteration found a singular matrix")
+                #     print(Gj.T @ self.R_inv @ Gj)
+                #     continue
+                A = Gj.T @ self.R_inv @ Gj + epsilon * np.eye(Gj.shape[1])
+                L = np.linalg.cholesky(A)
+                Delta_x = np.linalg.solve(L,Gj.T@ self.R_inv @ np.sum(y - gj , axis=0) / len(y))
                 J_min = self.Jwls(x_now, y, qr.sx, qr.sy)
                 gamma_min = 0
 
