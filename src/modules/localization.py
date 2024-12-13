@@ -87,10 +87,10 @@ class Localization:
         jacobian[0][2] = 0
         
         # df2 / dpx
-        jacobian[1][0] = (self.f * (-py + sy) * (1 + np.tan(psi - res)**2)) / (sx - px)**2  * (1 + (sy-py)**2/(sx-px)**2) 
+        jacobian[1][0] = (self.f * (-py + sy) * (1 + np.tan(psi - res)**2)) / ((sx - px)**2  * (1 + (sy-py)**2/(sx-px)**2))
         
         # df2 / dpy
-        jacobian[1][1] = (-self.f * (1 + np.tan(psi - res)**2)) / (sx - px)**2  * (1 + (sy-py)**2/(sx-px)**2) 
+        jacobian[1][1] = (-self.f * (1 + np.tan(psi - res)**2)) / ((sx - px)**2  * (1 + (sy-py)**2/(sx-px)**2)) 
         
         # df2 / dpsi
         jacobian[1][2] = (-self.f * (1 + np.tan(psi - res)**2))
