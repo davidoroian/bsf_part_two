@@ -10,7 +10,7 @@ from .qr_code import QrCode, Measurement
 class Localization:
     """Class for estimating the position of the robot"""
 
-    def __init__(self, h0:int, path:str, qr_codes: list[QrCode], distance_bias:int=0):
+    def __init__(self, h0:int, path:str, qr_codes: list[QrCode], distance_bias:int=0, nR=None, R_inv=Noe):
         """Constructor for the localization class.
         
         Args:
@@ -25,8 +25,8 @@ class Localization:
         self.camera_gradient, self.camera_bias = compute_gradient_and_bias(self.path, distance_bias)
         self.f = self.camera_gradient/h0
         self.average_location_estimate = []
-        self.R = 0
-        self.R_inv = 0
+        self.R = R
+        self.R_inv = R_inv
         # Computing the vairance matrices
         
 
