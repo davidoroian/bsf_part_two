@@ -10,7 +10,7 @@ from .qr_code import QrCode, Measurement
 class Localization:
     """Class for estimating the position of the robot"""
 
-    def __init__(self, h0:int, path:str, qr_codes: list[QrCode], distance_bias:int=0):
+    def __init__(self, h0:int, path:str, qr_codes: list[QrCode], distance_bias:int=0, R=None, R_inv=None):
         """Constructor for the localization class.
         
         Args:
@@ -25,8 +25,8 @@ class Localization:
         self.camera_gradient, self.camera_bias = compute_gradient_and_bias(self.path, distance_bias)
         self.f = self.camera_gradient/h0
         self.average_location_estimate = []
-        self.R = 0
-        self.R_inv = 0
+        self.R = R
+        self.R_inv = R_inv
         # Computing the vairance matrices
         
 
@@ -138,7 +138,7 @@ class Localization:
         e = (y - self.g(x, sx, sy)) @ self.R_inv
         return np.sum(e**2)
     
-    def localize(self, x_0=[0, 0, 0], N_gamma_grid=1000, gamma_max=50, iteration_end=100, epsilon=1e-8):
+    def localize(self, x_0=[0, 0, 0], N_gamma_grid=1000, gamma_max=50, iteration_end=10, epsilon=1e-8):
         """Routine for Gauss Netwon with Line Search"""
         # for qr in self.qr_codes:
         #     y = [[measurement.height, measurement.cx] for measurement in qr.measurements]
@@ -191,3 +191,31 @@ class Localization:
             qr.update_estimation([Estimation(x[0], x[1], x[2]) for x in x_LM])
         for i in range(iteration_end):
             self.average_location_estimate.append(Estimation(np.average([qr.estimation[i].px for qr in self.qr_codes]), np.average([qr.estimation[i].py for qr in self.qr_codes]), np.average([qr.estimation[i].psi for qr in self.qr_codes])))
+
+        def kalman_localize(self, P, x_0, R, iteration_end=10):
+            """Routine for Kalman Filter"""
+            for qr in self.qr_codes:
+                y = [[measurement.height, measurement.cx] for measurement in qr.measurements]
+                x_LM = np.zeros((iteration_end,3)) #the path of the estimation
+                x_LM[0,:] = x_0
+                I = np.eye(3)
+                lambda_LM = 0.01 # set this 0 and infinity (e.g. 1e10) to see the results.
+                nu = 10
+            for j in range(iteration_end-1):
+                x_now = x_LM[j,:]
+                gj = self.g(x_now, qr.sx, qr.sy)
+                Gj = self.G(x_now, qr.sx, qr.sy)
+                S = len(y)*Gj.T@P@Gj + lambda_LM*I
+                K = np.linalg.solve(S,Gj.T@P)
+                res = np.sum(y-gj,axis=0)
+                if res[2] > np.pi:
+                    res[2] = res[2] - 2*np.pi
+                elif res[2] < -np.pi:
+                    res[2] = res[2] + 2*np.pi 
+                if self.Jwls( x_now + dx,y,qr.sx,qr.sy) < self.Jwls( x_now,y,qr.sx,qr.sy):
+                    x_LM[j+1,:] = x_now + dx
+                    lambda_LM = lambda_LM / nu
+                else:
+                    x_LM[j+1,:] = x_now
+                    lambda_LM = lambda_LM * nu
+            qr.update_estimation([Estimation(x[0], x[1], x[2]) for x in x_LM])
