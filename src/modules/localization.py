@@ -68,6 +68,13 @@ class Localization:
         """
         px, py, psi = x
 
+
+        res = np.arctan2((sy-py), (sx-px))
+        if res > np.pi:
+            res = res - 2*np.pi
+        elif res < -np.pi:
+            res = res + 2*np.pi
+
         jacobian = np.zeros((2,3))
         
         # df1 / dpx
@@ -80,13 +87,13 @@ class Localization:
         jacobian[0][2] = 0
         
         # df2 / dpx
-        jacobian[1][0] = (self.f * (sy - py)) / (sx - px)**2   
+        jacobian[1][0] = (self.f * (-py + sy) * (1 + np.tan(psi - res)**2)) / (sx - px)**2  * (1 + (sy-py)**2/(sx-px)**2) 
         
         # df2 / dpy
-        jacobian[1][1] = - 1 / (sx - px + (sy - py) * np.tan(psi)) - ((sy - py - (sx - px) * np.tan(psi)) * np.tan(psi)) / ((sx - px + (sy - py) * np.tan(psi))**2)
+        jacobian[1][1] = (-self.f * (1 + np.tan(psi - res)**2)) / (sx - px)**2  * (1 + (sy-py)**2/(sx-px)**2) 
         
         # df2 / dpsi
-        jacobian[1][2] = (- (sx - px) * (sec(psi)) ** 2) / (sx - px + (sy - py) * np.tan(psi)) - ((sy - py - (sx - px) * np.tan(psi)) * (sy - py) * (sec(psi)) ** 2) / (sx - px + (sy - py) * np.tan(psi)) ** 2
+        jacobian[1][2] = (-self.f * (1 + np.tan(psi - res)**2))
     
         return jacobian
     
