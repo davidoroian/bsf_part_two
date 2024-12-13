@@ -138,6 +138,10 @@ class Localization:
         e = (y - self.g(x, sx, sy)) @ self.R_inv
         return np.sum(e**2)
     
+    def Jwls_2(self, x, y, sx, sy,R):
+        e = (y - self.g(x, sx, sy)) @ R
+        return np.sum(e**2)
+
     def localize(self, x_0=[0, 0, 0], N_gamma_grid=1000, gamma_max=50, iteration_end=100, epsilon=1e-8):
         """Routine for Gauss Netwon with Line Search"""
         # for qr in self.qr_codes:
@@ -191,3 +195,47 @@ class Localization:
             qr.update_estimation([Estimation(x[0], x[1], x[2]) for x in x_LM])
         for i in range(iteration_end):
             self.average_location_estimate.append(Estimation(np.average([qr.estimation[i].px for qr in self.qr_codes]), np.average([qr.estimation[i].py for qr in self.qr_codes]), np.average([qr.estimation[i].psi for qr in self.qr_codes])))
+
+    def Kalman_update(self, x_0, P_0, R , iteration_end=100):
+        x_estimates = []
+        P_estimates = []
+        for qr in self.qr_codes:
+            y = [[measurement.height, measurement.cx] for measurement in qr.measurements]
+            x_LM = np.zeros((iteration_end,3)) #the path of the estimation
+            P_LM = np.zeros((iteration_end,3,3)) #the path of the estimation
+            x_LM[0,:] = x_0
+            P_LM[0,:] = P_0
+            I = np.eye(2)
+            lambda_LM = 0.01 # set this 0 and infinity (e.g. 1e10) to see the results.
+            nu = 10
+            for j in range(iteration_end-1):
+                x_now = x_LM[j,:]
+                P_now = P_LM[j,:]
+                gj = self.g(x_now, qr.sx, qr.sy)
+                Gj = self.G(x_now, qr.sx, qr.sy)
+                S = len(y)*Gj@P_now@Gj.T + lambda_LM*I + R  
+                # if det(S) == 0:
+                #     print(S)
+                #     S += np.random.randn(2,2)*0.001 
+                #     print(S)
+                K = P_now @ Gj.T @ np.linalg.inv(S)  
+                res = np.sum(y-gj,axis=0)
+                if self.Jwls_2( x_now + K@res,y,qr.sx,qr.sy,R) < self.Jwls_2( x_now,y,qr.sx,qr.sy,R):
+                    x_LM[j+1,:] = x_now + K@res
+                    P_LM[j+1,:] = P_now - K @ S @ K.T
+                    lambda_LM = lambda_LM / nu
+                else:
+                    x_LM[j+1,:] = x_now
+                    P_LM[j+1,:] = P_now
+                    lambda_LM = lambda_LM * nu
+            x_estimates.append(x_LM[-1,:])
+            P_estimates.append(P_LM[-1,:])   
+        
+        
+            
+        average_estimate_px = np.round(np.mean([x[0] for x in x_estimates]),4)
+        average_estimate_py = np.round(np.mean([x[1] for x in x_estimates]),4)
+        average_estimate_phi = np.round(np.mean([x[2] for x in x_estimates]),4)
+        average_estimate_x = [average_estimate_px, average_estimate_py, average_estimate_phi]
+        average_estimate_P = np.round(np.mean([P_est for P_est in P_estimates]),4)
+        return average_estimate_x, average_estimate_P
