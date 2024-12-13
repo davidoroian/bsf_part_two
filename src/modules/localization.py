@@ -23,6 +23,7 @@ class Localization:
         self.qr_codes = qr_codes
         self.camera_gradient, self.camera_bias = compute_gradient_and_bias(self.path, distance_bias)
         self.f = self.camera_gradient/h0
+        self.average_location_estimate = []
 
         # Computing the vairance matrices
         avg_variance_cx = np.round(np.average([qr_code.var_cx for qr_code in qr_codes]), decimals=3) 
@@ -163,3 +164,5 @@ class Localization:
                     x_LM[j+1,:] = x_now
                     lambda_LM = lambda_LM * nu
             qr.update_estimation([Estimation(x[0], x[1], x[2]) for x in x_LM])
+        for i in range(iteration_end):
+            self.average_location_estimate.append(Estimation(np.average([qr.estimation[i].px for qr in self.qr_codes]), np.average([qr.estimation[i].py for qr in self.qr_codes]), np.average([qr.estimation[i].psi for qr in self.qr_codes])))
