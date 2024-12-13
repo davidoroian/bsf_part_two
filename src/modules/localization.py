@@ -10,7 +10,7 @@ from .qr_code import QrCode, Measurement
 class Localization:
     """Class for estimating the position of the robot"""
 
-    def __init__(self, h0:int, path:str, qr_codes: list[QrCode], distance_bias:int=0, nR=None, R_inv=Noe):
+    def __init__(self, h0:int, path:str, qr_codes: list[QrCode], distance_bias:int=0, R=None, R_inv=None):
         """Constructor for the localization class.
         
         Args:
