@@ -112,35 +112,54 @@ class Localization:
         e = (y - self.g(x, sx, sy)) @ self.R_inv
         return np.sum(e**2)
     
-    def localize(self, x_0=[0, 0, 0], N_gamma_grid=1000, gamma_max=50, iteration_end=10, epsilon=1e-8):
+    def localize(self, x_0=[0, 0, 0], N_gamma_grid=1000, gamma_max=50, iteration_end=100, epsilon=1e-8):
         """Routine for Gauss Netwon with Line Search"""
+        # for qr in self.qr_codes:
+        #     y = [[measurement.height, measurement.cx] for measurement in qr.measurements]
+        #     x_GN_LS = np.zeros((iteration_end,3)) #the path of the estimation
+        #     x_GN_LS[0,:] = x_0
+        #     gamma = np.arange(1,N_gamma_grid+1)*gamma_max/N_gamma_grid
+
+        #     for j in range(iteration_end-1):
+        #         x_now = x_GN_LS[j,:]
+        #         gj = self.g(x_now, qr.sx, qr.sy)
+        #         Gj = self.G(x_now, qr.sx, qr.sy)
+        #         # if (det(Gj.T @ self.R_inv @ Gj) == 0):
+        #         #     print(f"qr code {qr.id}, {j} th iteration found a singular matrix")
+        #         #     print(Gj.T @ self.R_inv @ Gj)
+        #         #     continue
+        #         A = Gj.T @ self.R_inv @ Gj + epsilon * np.eye(Gj.shape[1])
+        #         L = np.linalg.cholesky(A)
+        #         Delta_x = np.linalg.solve(L,Gj.T@ self.R_inv @ np.sum(y - gj , axis=0) / len(y))
+        #         # Delta_x = np.linalg.solve((Gj.T@self.R_inv@Gj)*len(y),Gj.T@self.R_inv@np.sum(y-gj,axis=0)/len(y))
+        #         J_min = self.Jwls(x_now, y, qr.sx, qr.sy)
+        #         gamma_min = 0
+
+        #         for k in range(N_gamma_grid):
+        #             J_prop = self.Jwls(x_now+gamma[k]*Delta_x, y, qr.sx, qr.sy)
+        #             if J_prop < J_min:
+        #                 J_min = J_prop
+        #                 gamma_min = gamma[k]
+
+        #         x_GN_LS[j+1,:] = x_now + gamma_min * Delta_x
+
+        #     qr.update_estimation([Estimation(x[0], x[1], x[2]) for x in x_GN_LS])
         for qr in self.qr_codes:
             y = [[measurement.height, measurement.cx] for measurement in qr.measurements]
-            x_GN_LS = np.zeros((iteration_end,3)) #the path of the estimation
-            x_GN_LS[0,:] = x_0
-            gamma = np.arange(1,N_gamma_grid+1)*gamma_max/N_gamma_grid
-
+            x_LM = np.zeros((iteration_end,3)) #the path of the estimation
+            x_LM[0,:] = x_0
+            I = np.eye(3)
+            lambda_LM = 0.01 # set this 0 and infinity (e.g. 1e10) to see the results.
+            nu = 10
             for j in range(iteration_end-1):
-                x_now = x_GN_LS[j,:]
+                x_now = x_LM[j,:]
                 gj = self.g(x_now, qr.sx, qr.sy)
                 Gj = self.G(x_now, qr.sx, qr.sy)
-                # if (det(Gj.T @ self.R_inv @ Gj) == 0):
-                #     print(f"qr code {qr.id}, {j} th iteration found a singular matrix")
-                #     print(Gj.T @ self.R_inv @ Gj)
-                #     continue
-                A = Gj.T @ self.R_inv @ Gj + epsilon * np.eye(Gj.shape[1])
-                L = np.linalg.cholesky(A)
-                Delta_x = np.linalg.solve(L,Gj.T@ self.R_inv @ np.sum(y - gj , axis=0) / len(y))
-                J_min = self.Jwls(x_now, y, qr.sx, qr.sy)
-                gamma_min = 0
-
-                for k in range(N_gamma_grid):
-                    J_prop = self.Jwls(x_now+gamma[k]*Delta_x, y, qr.sx, qr.sy)
-                    if J_prop < J_min:
-                        J_min = J_prop
-                        gamma_min = gamma[k]
-
-                x_GN_LS[j+1,:] = x_now + gamma_min * Delta_x
-
-            qr.update_estimation([Estimation(x[0], x[1], x[2]) for x in x_GN_LS])
-
+                dx = np.linalg.solve((len(y)*Gj.T@self.R_inv@Gj + lambda_LM*I),Gj.T@self.R_inv@np.sum(y-gj,axis=0))    
+                if self.Jwls( x_now + dx,y,qr.sx,qr.sy) < self.Jwls( x_now,y,qr.sx,qr.sy):
+                    x_LM[j+1,:] = x_now + dx
+                    lambda_LM = lambda_LM / nu
+                else:
+                    x_LM[j+1,:] = x_now
+                    lambda_LM = lambda_LM * nu
+            qr.update_estimation([Estimation(x[0], x[1], x[2]) for x in x_LM])
